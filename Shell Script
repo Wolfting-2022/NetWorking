@@ -1,0 +1,127 @@
+#!/bin/sh -u
+PATH=/bin:/usr/bin ; export PATH
+umask 022
+
+#  CST8207 Assignment 11 Shell Script Parameters and Control Flow
+#  4.3 searchNotes.sh
+#  xxxxxx   xxxxx@yyyyyy.com
+#  KEY : U2FsdGVkX18+9n1yveAJ2BbPTUf42UEU82fOvuMXoJUKzkh0gTD+i9AtxzPjdH6k
+#  Searches for course notes from 19W, default search string is “fifteen minutes”
+
+if [ $# -eq 0 ]; then
+	search=”fifteen minutes”
+else
+	if  [ $# -eq 1 ]; then
+		search=”$1”
+	else
+		echo “$0:error:expected 1 search found $# ($*)”>&2
+		echo “$0:usage: $0 search”>&2
+		exit 2
+	fi
+fi
+
+
+#!/bin/sh -u
+PATH=/bin:/usr/bin ; export PATH
+umask 022
+
+#  CST8207 Assignment 11 Shell Script Parameters and Control Flow
+#  4.4.1 thereIs.sh
+#  xxxxxx   xxxxx@yyyyyy.com
+#  KEY : U2FsdGVkX18+9n1yveAJ2BbPTUf42UEU82fOvuMXoJUKzkh0gTD+i9AtxzPjdH6k
+#  Create a program to check whether an argument pathname exists
+
+if [ $# -ne 1 ]; then
+	echo “$0:error:expected more than one argument, found $# ($*)”>&2
+	echo “$0:usage: $0 ‘1st#  2nd#’”>&2
+	exit 2
+fi
+
+if  [ "$1" = '' ]; then
+	echo “$0:error:expected one argument, found $# ($*)”>&2
+	echo “$0:usage: $0 ‘1st#  2nd#’”>&2
+	exit 2
+fi
+
+if  test -e "$1" ; then
+	echo “$0:suceed: argument to be found $# ($*)”
+	exit 0
+else
+	echo “$0:error: the pathname “$1” doesn\’t exist”
+	exit 1
+fi
+
+
+vi isExec.sh
+
+#!/bin/sh -u
+PATH=/bin:/usr/bin ; export PATH
+umask 022
+
+#  CST8207 Assignment 11 Shell Script Parameters and Control Flow
+#  4.4.1 isExec.sh
+#  xxxxx@yyyyyy.com
+#  KEY : U2FsdGVkX18+9n1yveAJ2BbPTUf42UEU82fOvuMXoJUKzkh0gTD+i9AtxzPjdH6k
+#  Create a program to find several pathname of argument by loop process 
+
+if  [ $# -eq 0 ]; then
+	echo “$0:error:expected one argument, but found $# ($*)”>&2
+	echo “$0:usage: $0 ‘1st#  2nd#’”>&2
+	exit 2
+fi
+
+for j do
+	if  [ "$1" = '' ]; then
+		echo "$0: is inaccessible or does not exist; skipped">&2
+	else
+		if test -x  "$1"; then
+			echo "$0: cannot be executable">&2
+		fi
+	fi
+fi
+
+
+#!/bin/sh -u
+PATH=/bin:/usr/bin ; export PATH
+umask 022
+
+#  CST8207 Assignment 11 Shell Script Parameters and Control Flow
+#  4.4.1 symType.sh
+#  xxxxxx   xxxxx@yyyyyy.com
+#  KEY : U2FsdGVkX18+9n1yveAJ2BbPTUf42UEU82fOvuMXoJUKzkh0gTD+i9AtxzPjdH6k
+#  Create a program to obtain an argument with symbolic pathname and judge it is a relative or absolute path 
+
+if [ $# -ne 1 ]; then
+	echo “$0:error:expected more than one argument, found $# ($*)”>&2
+	echo “$0:usage: $0 ‘1st#  2nd#’”>&2
+	exit 2
+fi
+
+if  [ "$1" = '' ]; then
+	echo “$0:error:expected one argument, found $# ($*)”>&2
+	echo “$0:usage: $0 ‘1st#  2nd#’”>&2
+	exit 2
+fi
+
+if  ! test -L "$1"; then
+	echo “$0:error:the pathname $* is not a symbolic link)”>&2
+	echo “$0:usage: $0 ‘1st#  2nd#’”>&2
+	exit 2
+fi
+
+SmbTarget=$ ls -l $* | awk ‘{print $NF}’
+
+# We need to make sure the listing worked and exit if it failed:
+
+if  [ "$ SmbTarget " = '' ]; then
+	echo “$0:error:expected one argument, found $# ($*)”>&2
+	echo “$0:usage: $0 ‘1st#  2nd#’”>&2
+	exit 3
+fi
+
+case "$SmbTarget" in
+/* )    type='an Absolute Pathname'  ;;
+*/ )    type='a Relative Pathname ending in a slash' ;;
+esac
+echo “$type: ‘$1’ -> 'target'”
+
