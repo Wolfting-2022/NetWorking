@@ -1,0 +1,188 @@
+//on router R1
+int vlan 1
+ip add x.x.x.x 255.255.255.x
+no shut
+int g0/0
+ip add x.x.x.x 255.255.255.x
+no shut
+int g0/1
+ip add x.x.x.x 255.255.255.x
+no shut
+
+ip route 0.0.0.0 0.0.0.0 x.x.x.x
+ip route x1.x.x.x 255.255.255.x y1.y.y.y 
+ip route x2.x.x.x 255.255.255.x y2.y.y.y 
+
+//on Layer3-Switch S1 and S2
+int range f0/1-24
+shut
+exit
+vtp mode trans
+vlan 100
+name xxxxx-PCs
+vlan 200
+name xxxxx-VMs
+vlan 999
+name Native
+vlan 500
+name Blackhole
+
+int range f0/7-8
+channel-group 1 mode active
+int range f0/7-8, po1
+sw tr encap dot1q
+sw mo tr
+sw tr native vlan 999
+sw tr allowed vlan 100,200
+sw nonegotiate
+no shut
+
+int range f0/9-10
+channel-group 2 mode des
+int range f0/9-10, po2
+sw tr encap dot1q
+sw mo tr
+sw tr native vlan 999
+sw tr allowed vlan 100,200
+sw nonegotiate
+no shut
+
+int f0/11
+no sw
+ip add x.x.x.x 255.255.255.x
+no shut
+
+int range f0/3
+no sw
+ip add x.x.x.x 255.255.255.x
+no shut
+
+int vlan 100
+ip add x.x.x.x 255.255.255.x
+no shut
+
+int vlan 200
+ip add x.x.x.x 255.255.255.x
+no shut
+exit
+
+ip routing
+ip route 0.0.0.0 0.0.0.0 x.x.x.x
+sp vlan 100 root primary
+ip route 0.0.0.0 0.0.0.0 x.x.x.x
+
+
+
+
+//on Layer2-Switch S3 and S4
+int range f0/1-24
+shut
+exit
+vtp mode trans
+vlan 100
+name xxxxx-PCs
+vlan 200
+name xxxxx-VMs
+vlan 999
+name Native
+vlan 500
+name Blackhole
+	
+int range f0/7-8
+channel-group 1 mode passive
+int range f0/7-8, po1
+sw tr encap dot1q
+sw mo trunk
+sw tr native vlan 999
+sw tr allowed vlan 100,200
+sw nonegotiate
+no shut
+
+int range f0/9-10
+channel-group 2 mode auto
+int range f0/9-10, po2
+sw tr encap dot1q
+sw mo trunk
+sw tr native vlan 999
+sw tr allowed vlan 100,200
+sw nonegotiate
+no shut
+
+
+//**DHCP config
+//on R1
+ip dhcp excluded-address x.x.x.x x.x.x.x
+ip dhcp pool VLAN200
+network x.x.x.x 255.255.255.x
+default-router x.x.x.x
+dns-server 199.9.9.9
+domain-name www.8315.com
+//on S1
+ip dhcp excluded-address x.x.x.x x.x.x.x
+ip dhcp pool VLAN100
+network x.x.x.x 255.255.255.x
+default-router x.x.x.x
+dns-server 199.9.9.9
+domain-name www.8315.com
+//on S2
+int vlan 200
+ip helper-add x.x.x.x
+
+
+//**Floating Static Routes(for S1/S2)
+//on S1
+ip route 0.0.0.0 0.0.0.0 x.x.x.x1 10
+//on S2
+ip route 0.0.0.0 0.0.0.0 x.x.x.x2 10
+
+//**Port security
+//on S3 and S4
+int f0/24
+sw mo ac
+sw ac vlan 100
+no shut 
+sw port-security
+sw port-security maximum 4
+sw port-security mac-address xx-xx-xx-xx-xx-xx
+sw port-security violation restrict
+spanning-tree portfast
+spanning-tree bpduguard enable
+
+int f0/1
+sw mo ac
+sw ac vlan 200
+no shut 
+sw port-security
+sw port-security maximum 4
+sw port-security mac-address sticky
+sw port-security violation restrict
+spanning-tree portfast
+spanning-tree bpduguard enable
+
+interface range f0/2,f0/5-6, f0/11-23
+sw mo ac
+sw ac vlan 500
+
+//**DHCP snooping
+//on S1 and S2
+ip dhcp snooping
+ip dhcp snooping vlan 100
+ip dhcp snooping vlan 200
+interface range f0/7-10 
+ip dhcp snooping trust
+interface range f0/1-2,f0/5-6,f0/12-24
+ip dhcp snooping limit rate 5
+//on S3 and S4
+ip dhcp snooping
+ip dhcp snooping vlan 100
+ip dhcp snooping vlan 200
+interface range f0/3-4,f0/7-10
+ip dhcp snooping trust
+interface range f0/1-2,fa0/5-6,f0/11-24
+ip dhcp snooping limit rate 5
+
+//**portfast and BPDU
+//on S3 and S4
+interface range f0/1,f0/24
+spanning-tree portfast
+spanning-tree bpduguard enable
