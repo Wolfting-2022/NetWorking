@@ -1,0 +1,284 @@
+LAB3--MST
+LAB4---VTP
+LAB5---EthernetChannel
+
+LAB7 Muti-Area OSPF
+LAB9 eBGP
+
+
+*******************************
+	on R1
+hostname R1
+no ip domain lookup
+interface Loopback0
+ ip address 209.209.209.209 255.255.255.255
+interface GigabitEthernet0/0
+ ip address 209.165.200.1 255.255.255.0
+ no shut
+line con 0
+ exec-timeout 0 0
+ logging synchronous
+line vty 0 4
+ privilege level 15
+ password cisco
+ login
+ transport input all
+	on S1
+hostname S1
+no ip domain-lookup
+ip routing
+interface FastEthernet0/11
+ no switchport
+ ip address 209.165.200.5 255.255.255.0
+ no shut
+interface Vlan1
+ no ip address
+ no shut
+interface range FastEthernet0/3-4
+ no shut
+interface Vlan20
+ ip address 172.16.20.5 255.255.255.0
+ no shut
+interface Vlan40
+ ip address 172.16.40.5 255.255.255.0
+ no shut
+line con 0
+ exec-timeout 0 0
+ logging synchronous
+line vty 0 4
+ privilege level 15
+ password cisco
+ login
+ transport input all
+---------------------------------
+	on S2
+hostname S2
+no ip domain-lookup
+ip routing
+interface range FastEthernet0/3-4
+ no shut
+interface Loopback0
+ ip address 6.6.6.6 255.255.255.255
+interface Loopback1
+ ip address 66.66.66.66 255.255.255.255
+interface Vlan1
+ no ip address
+ no shut
+interface Vlan20
+ ip address 172.16.20.6 255.255.255.0
+interface Vlan40
+ ip address 172.16.40.6 255.255.255.0
+line con 0
+ exec-timeout 0 0
+ logging synchronous
+line vty 0 4
+ privilege level 15
+ password cisco
+ login
+ transport input all
+------------------------------###	observe result!!
+muti-player can add vlan directly 
+sh ip int br---has vlan + ip infor
+sh vlan ---- has no infor???? 经过PT测试，的确可以自动生成VLAN
+
+Interface              IP-Address      OK? Method Status                Protocol
+Vlan20                 172.16.20.5     YES manual down                  down 
+Vlan40                 172.16.40.5     YES manual down                  down
+
+When set by vlan 20, then
+Interface              IP-Address      OK? Method Status                Protocol
+Vlan20                 172.16.20.5     YES manual up                        down
+
+when connect with f0/3-4
+then all up!!
+-----------------------------------
+*************************************
+on S1/S2
+int range f0/3-4
+ sw tr encapsulation dot1q
+ sw mo tr
+ channel-group 1 mode active
+-------------------------------###	no need!!!!
+int po1
+sw mo tr
+ no shut		#### due int f0/3-4 configed by trunk and no shut, then no need in po1!!!
+		#### without sw tr allowed/native as default is native=1, allowed =all!!!!
+sw tr native vlan 999 	just to display separately with differ vlan		
+================================### past lab S22_Lab_7~9!!
+ channel-group 1 mode desirable/PagP	on/Static
+int range f0/3-4,po1
+ sw tr encapsulation dot1q
+ sw mo tr
+ sw tr allowed/native vlan xxx,yyy
+ sw nonegotiate				
+=================================
+	sh etherchannel summary
+	sh int trunk  | inc trunking
+Group  Port-channel  Protocol    Ports
+------+-------------+-----------+----------------------------------------------
+
+1      Po1(SU)           LACP   Fa0/3(P) Fa0/4(P) 
+
+	sh sp
+VLAN0001
+  Spanning tree enabled protocol ieee
+  Root ID    Priority    32769
+             Address     0090.0C75.1B21
+             This bridge is the root
+             Hello Time  2 sec  Max Age 20 sec  Forward Delay 15 sec
+
+  Bridge ID  Priority    32769  (priority 32768 sys-id-ext 1)
+             Address     0090.0C75.1B21
+             Hello Time  2 sec  Max Age 20 sec  Forward Delay 15 sec
+             Aging Time  20
+
+Interface        Role Sts Cost      Prio.Nbr Type
+---------------- ---- --- --------- -------- --------------------------------
+Po1              Desg FWD 9         128.27   Shr
+ 		
+	sh run | beg interface
+*************************************
+on S1
+vtp version 3
+vtp domain ccnp
+vtp mode server
+vlan 20
+ exit
+vlan 40
+ exit
+	sh vtp status | inc ver|Dom|Num|Rev
+----------------------------------------------no need
+vtp password xxxx
+-----------------------------------------
+#vtp primary vlan 
+	sh vtp status | inc Primary (ID)		sh version | inc Base
+on S2
+vtp version 3
+vtp domain ccnp
+vtp mode client
+	sh vtp status | inc ver|Dom|Num|Rev
+	sh vlan br | inc VLAN0020| VLAN0040	to confirm the VLan message has update form S1!!1
+================================Attention
+must create vlan 20/40 this part but not in previous parts!!!!why???
+must same version,domain name,password
+to shorten VTP take-up time, shut and no shut int range f0/3-4 on S2  		if necceary to set!!!
+
+S1#sh ip int br | i man		when 
+FastEthernet0/11       209.165.200.5   YES manual up                    up 
+Vlan20                 172.16.20.5     YES manual up                    up 
+Vlan40                 172.16.40.5     YES manual up                    up
+=================================
+on S1
+spanning-tree mode mst		to enable running MST
+spanning-tree mst config		to enter mst config
+ name sba
+ revision 1
+ instance 1 vlan 20
+ instance 2 vlan 40
+ exit
+spanning-tree mst 1 root primary
+
+on S2
+spanning-tree mode mst
+spanning-tree mst config
+ name sba
+ revision 1
+ instance 1 vlan 20
+ instance 2 vlan 40
+ exit
+spanning-tree mst 2 root primary
+
+	sh sp mst configuration
+	sh sp root
+------------------------------------------
+	sh sp mst [x]
+	sh sp blockedports
+===============================
+spanning-tree mst xx root secondary
+
+MUST match: MST region name/revision number/VLAN to MST instance mapping
+
+To manipulate as root port on non-root bridges 
+1. change port cost (1~200,000)
+int range f0/3-4	shut
+int f0/3	sp mst 1 cost 1000	no shut
+2. change upstream port priority
+on UPSTEAM switch
+int f0/x	sp mst x priority 64(1~240 hop16)
+================================
+************************************
+on S1
+router ospf 1
+ router-id 0.0.0.1
+ network 172.16.20.0 0.0.0.255 area 0
+ network 172.16.40.0 0.0.0.255 area 0
+on S2
+router ospf 1
+ router-id 0.0.0.2
+ network 172.16.20.0 0.0.0.255 area 0
+ network 172.16.40.0 0.0.0.255 area 0
+	sh ip pro
+	sh ip ospf nei
+==================================
+1. due loopback0/1 both host not simulate user network,then no ospf advertise.
+if loopback has network, then { sh ip route ospf } has meaning!!!
+
+WRONG!! Later has config on S2 although it is ABR crossing over different areas!!!!
+
+2. specific use wildcard mask 	or 
+int vlan 20/40 	ip ospf 1 area 0 
+3. if it is muti-access network, then { sh ip ospf int [br] } has meaning!!!
+4. if one router config, 	all should config!!!!
+int vlan x/f0/x	ip ospf hello[-interval] 5		ip ospf dead[-interval] 20
+5. if manipulate DR/BDR, then can use
+int f0/x	ip ospf priority 0/1/255	clear ip ospf process on original DR!!!
+6. 2 way to set passive interface
+router ospf xxx	passive-int f0/x [lo1]
+router ospf xxx	passive-int default	no passive-interface f0/1
+7. if router ospf xxx	auto-cost reference-bandwidth 1000, then can display under
+	sh ip ospf	
+8. other show command
+	sh ip ospf  [int (f0/x) | nei |
+	sh ip ospf
+	sh ip database
+	sh ip ospf topology-info
+	sh ip ospf int vlan 	
+9. int f0/x		ip ospf cost 100/200
+===================================
+*************************************
+on S2
+router ospf 1
+ router-id 0.0.0.2				wrong becuase typo 0.0.0.1 that conflict
+ network 6.6.6.6 0.0.0.0 area 1
+ network 66.66.66.66 0.0.0.0 area 2
+*************************************
+on S1
+router bgp 300
+ bgp router-id 0.0.0.1
+ nei 209.165.200.1 remote-as 500
+ network 172.16.20.0 mask 255.255.255.0
+ network 172.16.40.0 mask 255.255.255.0
+
+on R1
+router bgp 500
+ bgp router-id 1.1.1.1
+ nei 209.165.200.5 remote-as 300
+ network 209.209.209.209 mask 255.255.255.255
+
+on R1
+router bgp 500
+ nei 209.165.200.5 default-origination		##PT has no such command for default under bgp!!!!
+
+on S1
+		delete!!!!	ip route 0.0.0.0 0.0.0.0 209.165.200.1\\or\\ f0/11	ip route 0.0.0.0 0.0.0.0 [ exit-if | next-hop-ip ]
+router ospf 1
+ default-information originate			##may need wait a minute or two
+===================================
+	sh ip bgp [neighbour | summary | ip-prefix]
+	sh ip route bgp
+===================================
+		PT cannot do summarize-only and default-originate!!!
+***************************************
+on S1
+	sh ip route ospf	sh ip route bgp
+ping 209.209.209.209
