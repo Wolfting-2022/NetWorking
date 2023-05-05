@@ -1,0 +1,214 @@
+//**on Layer3 switch as EDGE router
+ip routing
+int f0/1
+ no sw
+ ip add x.x.x.x 255.255.255.x
+ no shut
+ 		
+vtp mode trans
+vlan 5										
+int range f0/2-24
+ sw mo ac
+ sw ac vlan 5					
+int vlan 5
+ ip add x.x.x.x 255.255.255.x
+ no shut
+ip route 0.0.0.0 0.0.0.0 x.x.x.x
+	
+router ospf  1
+ router-id x.x.x.x
+ auto-cost reference-bandwidth 1000
+ passive-int f0/1					
+ default-information originate
+ exit
+int vlan 5
+ ip ospf 1 area 0
+int f0/1		
+ ip ospf 1 area 0
+ 
+//**on router GTWYA
+vtp mode trans
+ ip add x.x.x.x 255.255.255.x
+ no shut
+
+int range f0/3/0-5						
+ sw mo ac
+ sw ac vlan 10				
+int vlan 10
+ ip add x.x.x.x 255.255.255.x
+ ipv6 add x:x:x:x::1/64		
+ no shut
+
+router ospf 1
+ router-id x.x.x.x			
+ auto-cost reference-bandwidth 1000
+ passive-int vlan 10
+int g0/1
+ ip ospf 1 area 0 
+
+/*GRE tunnel--ipv6 on ipv4
+int tun 1
+ tun source g0/1
+ tun destination x.x.x.x
+ ipv6 add x::1 link-local
+ ipv6 enable
+ no shut
+ 
+/*ipv6 ospf tuning
+ipv6 unicast-routing
+ipv6 router ospf 1
+ router-id x.x.x.x			
+ auto-cost reference-bandwidth 1000
+ passive-int vlan 10
+
+int tun 1
+ ipv6 ospf 1 area 0	
+int vlan10	
+ ipv6 ospf 1 area 0
+ 
+ 
+//**on router GTWYB
+int g0/1
+ ip add x.x.x.x 255.255.255.x		
+ no shut
+/* using ROAS
+int g0/0
+ no shut 
+int g0/0.20
+ encap dot1q 20
+ ip add x.x.x.x 255.255.255.x
+ ipv6 add x:x:x:x::1/64
+int g0/0.30
+ encap dot1q 30
+ ip add x.x.x.x 255.255.255.x
+ ipv6 add x:x:x:x::1/64
+int g0/0.99
+ encap dot1q 99 native
+ no ip add 
+	
+router ospf  11
+ router-id x.x.x.x			
+ auto-cost reference-bandwidth 1000
+ passive-int g0/0.20
+ passive-int g0/0.30
+int g0/1
+ ip ospf 11 area 0
+ 
+/*GRE tunnel--ipv6 on ipv4
+int tun 1
+ tun source g0/1
+ tun destination x.x.x.x
+ ipv6 add x::2 link-local
+ ipv6 enable
+ no shut						
+int tun 2
+ tun source g0/1
+ tun destination x.x.x.x
+ ipv6 add x::150 link-local
+ ipv6 enable
+ no shut
+
+/* ipv6 OSPF
+ipv6 unicast-routing
+ipv6 router ospf 1
+ router-id x.x.x.x
+ auto-cost reference-bandwidth 1000
+ passive-int g0/0.20
+ passive-int g0/0.30 
+int tun 1
+ ipv6 ospf 1 area 0	
+int tun 2
+ ipv6 ospf 1 area 0
+ 
+ //**config GTWYB as ipv4 and ipv6 DHCP   
+ip dhcp excluded-address x.x.x.x
+ip dhcp pool VLAN20
+ network x.x.x.x 255.255.255.x
+ default-router x.x.x.x
+ dns-server 199.9.9.9
+ip dhcp excluded-address x.x.x.x
+ip dhcp pool VLAN30
+ network x.x.x.x 255.255.255.x
+ default-router x.x.x.x
+ dns-server 199.9.9.9
+
+ipv6 dhcp pool STATELESS
+ dns-server x:x:x::9
+int g0/0.20
+ ipv6 nd other-config-flag
+ ipv6 dhcp server STATELESS
+ 
+ipv6 dhcp pool STATEFUL
+ address prefix x:x:x:x::/64
+ dns-server x:x:x::9
+int g0/0.30
+ ipv6 nd managed-config-flag
+ ipv6 dhcp server STATEFUL
+ 
+ //**on Switch SB
+vlan 20
+vlan 30
+vlan 90
+vtp mode trans
+int f0/1
+ sw tr encap dot1q
+ sw mo tr
+ sw tr native vlan 90
+ sw tr allowed vlan 20,30
+ sw nonego
+ no shut
+int vlan 30
+ ip add x.x.x.x 255.255.255.x
+ no shut
+ip default-gateway x.x.x.1
+int range f0/2-12
+ sw mo ac
+ sw ac vlan20
+int range f0/13-24
+ sw mo ac
+ sw ac vlan30
+ 
+//**NAT and port-forwarding on GTWYA
+int vlan 10
+ ip nat inside
+int g0/1
+ ip nat outside
+ip access-list standard PAT
+ permit x.x.x.0 0.0.0.255
+ exit
+ip nat inside source list PAT int g0/1 overload
+ip nat inside source static tcp x.x.x.x y.y.y.y 80
+
+//**NAT on GTWYB
+int g0/0.20	
+ ip nat inside
+int g0/0.30
+ ip nat inside
+int g0/1
+ ip nat outside
+ip access-list standard PAT
+ permit x.x.x.0 0.0.0.255
+ permit x.x.x.0 0.0.0.255
+ip nat inside source list PAT int g0/1 overload
+ip nat inside source static tcp x.x.x.x y.y.y.y 2323
+
+//** ACL on GTWYA
+ip access-list extended WYA
+ permit udp host 199.9.9.9 gt 1023 host x.x.x.x gt 1023
+ permit tcp any eq 80 host x.x.x.x
+ permit icmp any host x.x.x.x echo-reply
+ permit tcp any host x.x.x.x established
+ permit ospf any any
+ permit gre any any
+ permit tftp any any
+int vlan30
+ ip access-group WYA out
+ 
+//** ACL on GTWYB
+ip access-list extended WYB
+ permit tcp any eq 23 host x.x.x.x
+ permit host 199.9.9.9 eq 22 host x.x.x.x
+ permit icmp any host x.x.x.x echo-reply
+ permit tcp any host x.x.x.x established
+int g0/0.30
+ ip access-group WYB out
