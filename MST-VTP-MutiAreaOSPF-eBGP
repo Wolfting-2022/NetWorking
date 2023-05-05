@@ -1,0 +1,92 @@
+//**basic on S1 and S2
+int range f0/3-4
+ sw tr encapsulation dot1q
+ sw mo tr
+ channel-group 1 mode active
+	sh etherchannel summary
+	sh int trunk  | inc trunking
+
+
+//**vtp
+/*on S1
+vtp version 3
+vtp domain ccnp
+vtp mode server
+vlan 20
+ exit
+vlan 40
+ exit
+	sh vtp status | inc ver|Dom|Num|Rev
+/*on S2	
+vtp version 3
+vtp domain ccnp
+vtp mode client
+	sh vtp status | inc ver|Dom|Num|Rev
+	sh vlan br | inc VLAN0020| VLAN0040	
+
+
+//**mst
+/* on S1
+spanning-tree mode mst
+spanning-tree mst config
+ name sba
+ revision 1
+ instance 1 vlan 20
+ instance 2 vlan 40
+ exit
+spanning-tree mst 1 root primary
+
+/*on S2
+spanning-tree mode mst
+spanning-tree mst config
+ name sba
+ revision 1
+ instance 1 vlan 20
+ instance 2 vlan 40
+ exit
+spanning-tree mst 2 root primary
+	sh sp mst configuration
+	sh sp root
+
+
+//**ospf	
+/*on S1
+router ospf 1
+ router-id 0.0.0.1
+ network 172.16.20.0 0.0.0.255 area 0
+ network 172.16.40.0 0.0.0.255 area 0
+
+/*on S2
+router ospf 1
+ router-id 0.0.0.2
+ network 172.16.20.0 0.0.0.255 area 0
+ network 172.16.40.0 0.0.0.255 area 0
+	sh ip pro
+	sh ip ospf nei
+/*on S2
+router ospf 1
+ router-id 0.0.0.2
+ network 6.6.6.6 0.0.0.0 area 1
+ network 66.66.66.66 0.0.0.0 area 2
+
+
+//** bgp
+/*on S1
+router bgp 300
+ bgp router-id 0.0.0.1
+ nei 209.165.200.1 remote-as 500
+ network 172.16.20.0 mask 255.255.255.0
+ network 172.16.40.0 mask 255.255.255.0
+
+/*on R1
+router bgp 500
+ bgp router-id 1.1.1.1
+ nei 209.165.200.5 remote-as 300
+ network 209.209.209.209 mask 255.255.255.255
+router bgp 500
+ nei 209.165.200.5 default-origination
+
+/*on S1
+router ospf 1
+ default-information originate
+
